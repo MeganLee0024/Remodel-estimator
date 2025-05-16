@@ -1,0 +1,101 @@
+import streamlit as st
+import pandas as pd
+
+st.set_page_config(page_title="Remodel Estimator", layout="wide")
+st.title("Remodel Cost Estimator & CRM")
+
+# --- Session State for Client Records ---
+if "clients" not in st.session_state:
+    st.session_state.clients = []
+
+# --- Sidebar Client CRM ---
+st.sidebar.header("Client CRM")
+with st.sidebar.expander("Add New Client"):
+    new_client = {}
+    new_client["Name"] = st.text_input("Client Name")
+    new_client["Email"] = st.text_input("Client Email")
+    new_client["Phone"] = st.text_input("Client Phone")
+    new_client["Project Address"] = st.text_input("Project Address")
+    if st.button("Save Client Info"):
+        st.session_state.clients.append(new_client)
+        st.success("Client added.")
+
+# --- View Clients ---
+st.sidebar.subheader("Saved Clients")
+if st.session_state.clients:
+    client_df = pd.DataFrame(st.session_state.clients)
+    st.sidebar.dataframe(client_df)
+else:
+    st.sidebar.info("No clients added yet.")
+
+# --- Project Details ---
+st.header("Project Details")
+project_type = st.selectbox("Remodel Type", ["Kitchen", "Bathroom", "Basement", "Full House"])
+sq_ft = st.number_input("Square Footage", min_value=0)
+quality = st.radio("Finish Quality", ["Basic", "Mid-Grade", "High-End"])
+region = st.selectbox("Project Region", ["National Avg", "Utah", "California", "Texas", "New York"])
+
+# --- Optional Upgrades ---
+st.subheader("Optional Upgrades")
+appliances = st.checkbox("New Appliances")
+flooring = st.checkbox("New Flooring")
+lighting = st.checkbox("Lighting Upgrade")
+
+# --- Pricing Data ---
+base_costs = {
+    "Kitchen": {"Basic": 100, "Mid-Grade": 150, "High-End": 200},
+    "Bathroom": {"Basic": 80, "Mid-Grade": 120, "High-End": 180},
+    "Basement": {"Basic": 60, "Mid-Grade": 90, "High-End": 130},
+    "Full House": {"Basic": 110, "Mid-Grade": 160, "High-End": 210},
+}
+
+region_multipliers = {
+    "National Avg": 1.0,
+    "Utah": 0.95,
+    "California": 1.2,
+    "Texas": 0.98,
+    "New York": 1.3,
+}
+
+upgrade_costs = {
+    "Appliances": 3000,
+    "Flooring": 5 * sq_ft,
+    "Lighting": 1500,
+}
+
+# --- Calculation ---
+material_cost = base_costs[project_type][quality] * sq_ft
+region_adjusted_cost = material_cost * region_multipliers[region]
+
+upgrade_total = 0
+if appliances:
+    upgrade_total += upgrade_costs["Appliances"]
+if flooring:
+    upgrade_total += upgrade_costs["Flooring"]
+if lighting:
+    upgrade_total += upgrade_costs["Lighting"]
+
+labor_cost = 0.2 * (region_adjusted_cost + upgrade_total)
+total_estimate = region_adjusted_cost + upgrade_total + labor_cost
+
+# --- Display Estimate ---
+st.subheader("Estimated Project Cost")
+st.write(f"**Materials:** ${region_adjusted_cost:,.2f}")
+st.write(f"**Upgrades:** ${upgrade_total:,.2f}")
+st.write(f"**Labor (20%):** ${labor_cost:,.2f}")
+st.success(f"**Total Estimate: ${total_estimate:,.2f}**")
+
+# --- Download Proposal ---
+st.subheader("Download Proposal")
+proposal_data = {
+    "Project Type": project_type,
+    "Square Footage": sq_ft,
+    "Finish Quality": quality,
+    "Region": region,
+    "Materials": f"${region_adjusted_cost:,.2f}",
+    "Upgrades": f"${upgrade_total:,.2f}",
+    "Labor": f"${labor_cost:,.2f}",
+    "Total Estimate": f"${total_estimate:,.2f}"
+}
+proposal_df = pd.DataFrame([proposal_data])
+st.download_button("Download Estimate as CSV", proposal_df.to_csv(index=False), file_name="proposal_estimate.csv")
